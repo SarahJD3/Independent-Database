@@ -1,0 +1,175 @@
+-- DML and Queries Food Purchases
+-- Author: Sarah (Dahms) Schoem
+-- Course: DBST651, Spring 2024
+
+-- Populate purchase table
+INSERT INTO purchase (food_id, name, quantity_available, expiration_date, date_purchased, type, subtype)
+VALUES
+(seq_purchase_id.NEXTVAL, 'Apple', 10, '2024-04-30', '2024-04-01', 'perishable', 'produce'),
+(seq_purchase_id.NEXTVAL, 'Chicken Breast', 5, '2024-04-10', '2024-03-29', 'perishable', 'meat'),
+(seq_purchase_id.NEXTVAL, 'Milk', 2, '2024-04-05', '2024-03-30', 'perishable', 'dairy'),
+(seq_purchase_id.NEXTVAL, 'Rice', 1, NULL, '2024-03-25', 'non-perishable', NULL),
+(seq_purchase_id.NEXTVAL, 'Tomato', 7, '2024-04-03', '2024-03-30', 'perishable', 'produce');
+
+-- Populate user table
+INSERT INTO "user" (user_id, username, password, email, joined_date)
+VALUES
+(seq_user_id.NEXTVAL, 'user1', 'password1', 'user1@example.com', '2024-01-01'),
+(seq_user_id.NEXTVAL, 'user2', 'password2', 'user2@example.com', '2024-01-15');
+
+-- Populate inventory table
+INSERT INTO inventory (inventory_id, food_id, total_food_items, storage_condition, total_stored, location)
+VALUES
+(seq_inventory_id.NEXTVAL, 1, 10, 'fridge', 10, 'kitchen'),
+(seq_inventory_id.NEXTVAL, 2, 5, 'fridge', 5, 'kitchen'),
+(seq_inventory_id.NEXTVAL, 3, 2, 'fridge', 2, 'kitchen'),
+(seq_inventory_id.NEXTVAL, 4, 1, 'pantry', 1, 'kitchen'),
+(seq_inventory_id.NEXTVAL, 5, 7, 'counter', 7, 'kitchen');
+
+-- Populate shopping_list table
+INSERT INTO shopping_list (list_id, user_id, list_name, description, occasion, creation_date)
+VALUES
+(seq_list_id.NEXTVAL, 1, 'Monday shopping list', 'necessities', NULL, '2024-04-01'),
+(seq_list_id.NEXTVAL, 2, 'Weekly grocery list', 'weekly essentials', NULL, '2024-04-01');
+
+-- Populate food_supplier table
+INSERT INTO food_supplier (supplier_id, supplier_name, supplier_address, supplier_phone, operation_hours)
+VALUES
+(seq_supplier_id.NEXTVAL, 'Local Grocery Store', '123 Main St', '555-123-4567', '9am-9pm');
+
+--QUERIES
+
+-- Query 1: Select all columns and rows from a table
+SELECT *
+FROM "user";
+
+-- Query 2: Select five columns and all rows from one table
+SELECT food_id, name, quantity_available, expiration_date, date_purchased
+FROM purchase;
+
+-- Query 3: Select all columns from all rows from one view
+SELECT *
+FROM view_expired_inventory;
+
+-- Query 4: Using a join on 2 tables, select all columns and all rows from the tables without the use of a Cartesian product
+SELECT p., i.
+FROM purchase p
+INNER JOIN inventory i ON p.food_id = i.food_id;
+
+-- Query 5: Select and order data retrieved from one table
+SELECT *
+FROM "user"
+ORDER BY joined_date DESC;
+
+-- Query 6: Using a join on 3 tables, select 5 columns from the 3 tables. Use syntax that would limit the output to 10 rows
+SELECT u.username, p.name, i.total_food_items, m.name, f.supplier_name
+FROM "user" u
+JOIN purchase p ON u.user_id = p.food_id
+JOIN inventory i ON p.food_id = i.food_id
+JOIN meal_plans m ON u.user_id = m.plan_id
+JOIN food_supplier f ON i.food_id = f.supplier_id
+FETCH FIRST 10 ROWS ONLY;
+
+-- Query 7: Select distinct rows using joins on 3 tables
+SELECT DISTINCT u.username, p.name, i.total_food_items
+FROM "user" u
+JOIN purchase p ON u.user_id = p.food_id
+JOIN inventory i ON p.food_id = i.food_id;
+
+-- Query 8: Use GROUP BY and HAVING in a select statement using one or more tables
+SELECT p.name, SUM(i.total_food_items) AS total_items
+FROM purchase p
+JOIN inventory i ON p.food_id = i.food_id
+GROUP BY p.name
+HAVING SUM(i.total_food_items) > 5;
+
+-- Query 9: Use IN clause to select data from one or more tables
+SELECT *
+FROM purchase
+WHERE food_id IN (SELECT food_id FROM inventory WHERE total_food_items > 5);
+
+-- Query 10: Select length of one column from one table (use LENGTH function)
+SELECT LENGTH(name) AS name_length
+FROM purchase;
+
+-- Query 11: Delete one record from one table. Use select statements to demonstrate the table contents before and after the DELETE statement. Make sure you use ROLLBACK afterwards so that the data will not be physically removed
+-- Before delete
+SELECT * FROM purchase;
+
+DELETE FROM purchase WHERE food_id = 1;
+
+-- After delete
+SELECT * FROM purchase;
+
+ROLLBACK; -- Undo the delete operation
+
+-- Query 12: Update one record from one table. Use select statements to demonstrate the table contents before and after the UPDATE statement. Make sure you use ROLLBACK afterwards so that the data will not be physically removed
+-- Before update
+SELECT * FROM purchase;
+
+UPDATE purchase SET quantity_available = 20 WHERE food_id = 1;
+
+-- After update
+SELECT * FROM purchase;
+
+ROLLBACK; -- Undo the update operation
+
+-- Advanced Queries
+
+-- Query 13: Using subqueries, retrieve the username and email of users who have purchased more than 10 items.
+SELECT username, email
+FROM "user"
+WHERE user_id IN (
+SELECT food_id
+FROM purchase
+WHERE quantity_available > 10
+);
+
+-- Query 14: Retrieve the top 5 users with the highest total quantity of items purchased.
+SELECT u.username, SUM(p.quantity_available) AS total_quantity
+FROM "user" u
+JOIN purchase p ON u.user_id = p.food_id
+GROUP BY u.username
+ORDER BY total_quantity DESC
+FETCH FIRST 5 ROWS ONLY;
+
+-- Query 15: Calculate the average quantity of items purchased per user.
+SELECT u.username, AVG(p.quantity_available) AS avg_quantity
+FROM "user" u
+JOIN purchase p ON u.user_id = p.food_id
+GROUP BY u.username;
+
+-- Query 16: Retrieve the username of users who have purchased both perishable and non-perishable items.
+SELECT u.username
+FROM "user" u
+JOIN purchase p ON u.user_id = p.food_id
+WHERE p.type IN ('perishable', 'non-perishable')
+GROUP BY u.username
+HAVING COUNT(DISTINCT p.type) = 2;
+
+
+-- Query 17: Calculate the total quantity of perishable items purchased in each location.
+SELECT i.location, SUM(p.quantity_available) AS total_perishable_quantity
+FROM inventory i
+JOIN purchase p ON i.food_id = p.food_id
+WHERE p.type = 'perishable'
+GROUP BY i.location;
+
+-- Query 18: Retrieve the top 3 suppliers who have supplied the highest quantity of items, along with the total quantity of items supplied by each supplier.
+SELECT fs.supplier_name, SUM(i.total_food_items) AS total_supplied_quantity
+FROM food_supplier fs
+JOIN inventory i ON fs.supplier_id = i.food_id
+GROUP BY fs.supplier_name
+ORDER BY total_supplied_quantity DESC
+FETCH FIRST 3 ROWS ONLY;
+
+-- Query 19: Find the average number of days between the purchase date and the expiration date for each type of item (perishable/non-perishable).
+SELECT type, AVG(DATEDIFF(expiration_date, date_purchased)) AS avg_days_to_expire
+FROM purchase
+GROUP BY type;
+
+-- Query 20: Identify users who have not made any purchases and have joined the system before a certain date.
+SELECT username, joined_date
+FROM "user"
+WHERE user_id NOT IN (SELECT DISTINCT food_id FROM purchase)
+AND joined_date < '2024-03-01';

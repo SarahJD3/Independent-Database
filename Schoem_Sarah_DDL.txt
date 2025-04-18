@@ -1,0 +1,157 @@
+-- Store Food Purchases
+-- Sarah (Dahms) Schoem
+-- Spring 2024 DBST651
+
+
+
+-- Set echo on to display commands before execution
+SET ECHO ON;
+
+-- Use the database
+USE kitchen;
+
+-- Drop statements
+-- Drop triggers
+DROP TRIGGER IF EXISTS trg_purchase_audit;
+DROP TRIGGER IF EXISTS trg_inventory_update;
+
+-- Drop sequences
+DROP SEQUENCE IF EXISTS seq_purchase_id;
+DROP SEQUENCE IF EXISTS seq_user_id;
+DROP SEQUENCE IF EXISTS seq_inventory_id;
+DROP SEQUENCE IF EXISTS seq_plan_id;
+DROP SEQUENCE IF EXISTS seq_supplier_id;
+
+-- Drop views
+DROP VIEW IF EXISTS view_expired_inventory;
+DROP VIEW IF EXISTS view_recent_purchases;
+
+-- Drop tables in reverse order of creation
+DROP TABLE IF EXISTS food_supplier;
+DROP TABLE IF EXISTS meal_plans;
+DROP TABLE IF EXISTS inventory;
+DROP TABLE IF EXISTS user;
+DROP TABLE IF EXISTS purchase;
+
+-- Create tables
+CREATE TABLE purchase (
+    food_id INT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    quantity_available INT,
+    expiration_date DATE,
+    date_purchased DATE,
+    type ENUM('perishable', 'non-perishable'),
+    subtype ENUM('produce', 'meat', 'dairy')
+);
+
+CREATE TABLE user (
+    user_id INT PRIMARY KEY,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    joined_date DATE DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE inventory (
+    inventory_id INT PRIMARY KEY,
+    food_id INT,
+    total_food_items INT,
+    total_stored DECIMAL(10,2),
+    storage_condition VARCHAR(100),
+    location VARCHAR(255),
+    FOREIGN KEY (food_id) REFERENCES purchase(food_id)
+);
+
+CREATE TABLE meal_plans (
+    plan_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    start_date DATE,
+    end_date DATE
+);
+
+CREATE TABLE food_supplier (
+    supplier_id INT PRIMARY KEY,
+    supplier_name VARCHAR(100) NOT NULL,
+    supplier_address VARCHAR(255),
+    supplier_phone VARCHAR(20),
+    operation_hours VARCHAR(100)
+);
+
+-- Create indexes
+CREATE INDEX idx_purchase_name ON purchase(name);
+CREATE INDEX idx_user_username ON user(username);
+
+-- Create sequences
+CREATE SEQUENCE seq_purchase_id START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_user_id START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_inventory_id START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_plan_id START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_supplier_id START WITH 1 INCREMENT BY 1;
+
+-- Create views
+CREATE VIEW view_expired_inventory AS
+SELECT *
+FROM inventory
+WHERE expiration_date < CURRENT_DATE;
+
+CREATE VIEW view_recent_purchases AS
+SELECT *
+FROM purchase
+WHERE date_purchased >= CURRENT_DATE - INTERVAL 7 DAY;
+
+-- Create triggers
+-- Trigger 1: Purchase Audit Trail
+/*
+This trigger automatically logs any changes made to the purchase table into an audit table for tracking purposes.
+*/
+CREATE TRIGGER trg_purchase_audit
+AFTER INSERT OR UPDATE OR DELETE ON purchase
+FOR EACH ROW
+BEGIN
+    -- Audit action
+    INSERT INTO purchase_audit (food_id, action, action_time)
+    VALUES (NEW.food_id, CONCAT(UPPER(ACTION_TYPE()), 'D'), NOW());
+END;
+
+-- Trigger 2: Inventory Update
+/*
+This trigger updates the total_stored column in the inventory table when a new purchase is made or the quantity changes.
+*/
+CREATE TRIGGER trg_inventory_update
+AFTER INSERT OR UPDATE ON purchase
+FOR EACH ROW
+BEGIN
+    IF (NEW.date_purchased IS NOT NULL) THEN
+        UPDATE inventory 
+        SET total_stored = total_stored + NEW.quantity_available 
+        WHERE food_id = NEW.food_id;
+    END IF;
+END;
+
+-- Query to demonstrate the successful creation of tables
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'kitchen';
+
+-- Query to demonstrate the successful creation of indexes
+SELECT index_name, table_name
+FROM information_schema.statistics
+WHERE table_schema = 'kitchen';
+
+-- Query to demonstrate the successful creation of sequences
+SELECT sequence_name
+FROM information_schema.sequences
+WHERE sequence_schema = 'kitchen';
+
+-- Query to demonstrate the successful creation of views
+SELECT table_name
+FROM information_schema.views
+WHERE table_schema = 'kitchen';
+
+-- Query to demonstrate the successful creation of triggers
+SELECT trigger_name, event_object_table
+FROM information_schema.triggers
+WHERE trigger_schema = 'kitchen';
+
+
